@@ -1,0 +1,22 @@
+#!/bin/bash
+
+_G_LOG_FILE=output
+
+PASSED_INFO="TEST Passed"
+FAILED_INFO="TEST Failed"
+
+function __case_passed
+{
+    echo "passed in template"
+}
+
+function __case_failed
+{
+    echo "failed in template"
+}
+
+function __execute
+{
+    echo "template with executing..."
+    return 0
+}

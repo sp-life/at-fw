@@ -1,0 +1,19 @@
+#!/bin/bash
+
+function _case_failed
+{
+    local ret=$(__case_failed)
+    echo $FAILED_INFO
+#    [[ $ret -eq 0 ]] && exit 1 || exit $ret
+}
+
+function _case_passed
+{
+    __case_passed
+    echo $PASSED_INFO
+#    exit 0
+}
+
+__execute $* 2>&1
+[[ $? != 0 ]] && _case_failed || _case_passed
+
