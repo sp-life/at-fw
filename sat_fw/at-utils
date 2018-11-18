@@ -1,0 +1,128 @@
+#!/bin/bash
+
+##############################################################################
+# BEG: dict impentation
+#-----------------------------------------------------------------------------
+# dict string defines as following format:
+#   "{key1=val1; key2=val 2; key3='val3'; ...}"
+#   - the both key & value mustn't include ';' character;
+#   - the key mustn't include space(' ') character;
+#-----------------------------------------------------------------------------
+ATU_MIN_RETRIEVE_ARGC=2
+ATU_EMPTY_DICT='{}'
+ATU_REPL_SP='!'
+
+# get the key's value from dict string.
+function dict_value #$1: dict, $2: key
+{
+    local dict=$1
+    local key=$2
+    echo $dict | awk -F$key'=' '{print $2}' | awk -F';' '{print $1}'
+}
+
+# update the key's value or insert new key to dict.
+function dict_update #$1: dict, $2: key=val
+{
+    local dict=$1
+    if [[ $dict == $ATU_EMPTY_DICT ]]; then
+        dict=$ATU_EMPTY_DICT
+    fi
+
+    local kv=$2
+    if [[ $kv =~ .*=.* ]]; then
+        # found value need be updated.
+        local key=${kv%=*}
+        local val=${kv#*=}
+        if [[ -z $(dict_value $dict $key) ]]; then
+            # append kv
+            echo ${dict/\}/$kv;\}}
+        else
+            echo $dict | sed 's#\('$key'=\)[^;]*;#\1'$val';#'
+        fi
+    else
+        # no value need be updated, remove key.
+        if [[ -n $(dict_value $dict $kv) ]]; then
+            echo $dict | sed 's#'$kv'[^;]*;##'
+        fi
+    fi
+}
+
+# retrieve the dict, and callback with corresponding key & value.
+# TODO: note: the callback function should treat all rest args from 2nd as value.
+function dict_retrieve #$1: dict, $2: func_cb
+{
+    local dict=$1
+    local func_cb=$2
+    [[ ${#@} -lt $ATU_MIN_RETRIEVE_ARGC ]] && return 1
+    if [[ $dict != $ATU_EMPTY_DICT ]]; then
+        local ckvlist=($(echo $dict | sed 's# *\([{}=;]\) *#\1#g; s# #'$ATU_REPL_SP'#g; s#;#" "#g; s#[{}]#"#g'))
+        for ckv in ${ckvlist[@]}; do
+            local key=${ckv%=*}
+            local val=${ckv#*=}
+            func_cb $key ${val//$ATU_REPL_SP/ }
+        done
+    fi
+}
+# END: dict implentation
+##############################################################################
+
+
+##############################################################################
+# BEG: log
+function __log #$1: tag, $2: content
+{
+    echo $*
+}
+
+function logi
+{
+    __log '[INFO]:' $@
+}
+
+function loge
+{
+    __log '[ERROR]:' $@
+}
+
+function logw
+{
+    __log '[WARNING]:' $@
+}
+
+function rpt
+{
+    __log '[REPORT]:' $@
+}
+# END: log
+##############################################################################
+
+function _def #$1: size, $2..$n: array, $...: definitions
+{
+    local n=$1
+    shift
+    local exp_array=(${@:1:$n})
+    shift $n
+    local kv=${@:1}
+    if [[ $kv != ${kv%=*} ]]; then
+        eval $kv
+        eval export ${kv%=*}
+        echo "(${exp_array[@]} ${kv%=*})"
+    else
+        eval $kv=${@:2}
+        eval export $kv
+        echo "(${exp_array[@]} $kv)"
+    fi
+}
+
+function _undef #$@: array
+{
+    while [[ ${#@} -gt 0 ]]; do
+        eval unset $1
+        shift
+    done
+}
+
+function __OCCUPY_LINE_DELETE_ME__
+{
+    printf ""
+}

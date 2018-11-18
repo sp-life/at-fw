@@ -1,16 +1,15 @@
 #!/bin/bash
 
-PROJ_NAME=sof-test-suites
+# includes
+. sat_fw/at-framework
+. sat_fw/at-utils
+. sat_fw/conf-parser
+
 #/----------------------------------------------------------------------------
 #| @title AT Main Entrance
 #| @param   $*  the arguments list need parser
 #/----------------------------------------------------------------------------
-function parser_options
-{
-    
-}
 #\----------------------------------------------------------------------------
-
 ##############################################################################
 # Variant Definitions
 #-----------------------------------------------------------------------------
@@ -19,35 +18,199 @@ DEV_PLATFORM=
 #\----------------------------------------------------------------------------
 
 #/-- Definitions Field B -----------------------------------------------------
+SAT_ROOT=$(dirname `pwd`/$0)
+PROJ_NAME=sof-test-suites
+PROJ_ROOT=$SAT_ROOT/$PROJ_NAME
 LOG_FILE_NAME=
+FORCE_CONFIRMED=false
+REPORT_ROOT=$SAT_ROOT/report
+REPORT_TYPE=text
+OPERATE_ORDER=(s e c u l x)
+TEST_SUITES=()
+F_PROJ_CONF=_proj.cfg
+F_SUITE_CONF=_suite.cfg
+F_INIT_ENV=_init_env
+F_CASES_FLAG=.cs
+F_BASE_SUITE=__base__     # TODO: Need be replaced with .cs inside state value
+#\----------------------------------------------------------------------------
+
+export SAT_ROOT
+
+#/-- Definitions Resources ---------------------------------------------------
+STR_PROPMT_NEW_PROJECT="Project(%s) Missed , create project now?(Yes/no): "
+STR_PROPMT_NEW_SUITE="Test suite(%s) Missed , create test suite now?(Yes/no): "
 #\----------------------------------------------------------------------------
 # END: Config File Load
 ##############################################################################
+
+function create_project #$1: projName
+{
+    local projName=$1
+    PROJ_ROOT=$SAT_ROOT/$projName
+    if [[ $FORCE_CONFIRMED == true ]]; then
+        mkdir -p $PROJ_ROOT
+        conf_new_proj $PROJ_ROOT/$F_PROJ_CONF
+        conf_general_upd $PROJ_ROOT/$F_PROJ_CONF "REPORT_ROOT=$REPORT_ROOT"
+        conf_general_upd $PROJ_ROOT/$F_PROJ_CONF "REPORT_TYPE=$REPORT_TYPE"
+    else
+        printf "$STR_PROPMT_NEW_PROJECT" $projName
+        read comfirmed
+        if [[ $comfirmed == 'no' ]]; then
+            loge "No valid project, failed to run the auto test..."
+            exit 1
+        else
+            mkdir -p $PROJ_ROOT
+            conf_new_proj $PROJ_ROOT/$F_PROJ_CONF
+        fi
+    fi
+}
+
+function execute_base_suite
+{
+    [[ ! -d $PROJ_ROOT/$F_BASE_SUITE ]] && {
+        logw "No base test suite for the project, skipping base test..."
+        return 0
+    }
+    execute_suite $PROJ_ROOT/$F_BASE_SUITE
+}
+
+function process_options #$*: optArray
+{
+    local optArray=($*)
+    for o in ${OPERATE_ORDER[@]}; do
+        for i in ${optArray[@]}; do
+            if [[ $o == ${i%:*} ]]; then
+                case $o in
+                    s)  # select test suite, if not exist, create one manually or automatically.
+                        # it is used for -l & -c
+                        local suite=${i#*:}
+                        local suiteArray=(${suite//;/ })
+
+                        for ts in ${suiteArray[@]}; do
+                            # relevant path convert to abosulate path
+                            [[ ${ts:0:1} != '/' ]] && ts=$PROJ_ROOT/$ts
+
+                            if [[ ! -d $ts ]]; then
+                                if [[ $FORCE_CONFIRMED == true ]]; then
+                                    mkdir -p $ts
+                                    conf_new_suite $ts/$F_SUITE_CONF
+                                fi
+
+                                # TODO: current only support create test suite under 1-level project directory.
+                                # need be extented no limited directory depth in furture.
+                                printf "$STR_PROPMT_NEW_SUITE" `basename $ts`
+                                read comfirmed
+                                if [[ $comfirmed == 'no' ]]; then
+                                    logw "Invalid test suite, skip to preparing load ..."
+                                    continue
+                                else
+                                    mkdir -p $PROJ_ROOT
+                                    conf_new_proj $PROJ_ROOT/$F_PROJ_CONF
+                                fi
+                            fi
+                            TEST_SUITES=(${TEST_SUITES[@]} $ts)
+                        done
+                        ;;
+
+                    e)  # enable/disable test suites
+                        local suite=${i#*:}
+                        logi "Enabled/disable the suites: "$suite
+                        local suiteArray=(${suite//;/ })
+                        for ts in ${suiteArray[@]}; do
+                                # relevant path convert to abosulate path
+                            [[ ${ts:0:1} != '/' ]] && ts=$PROJ_ROOT/$ts
+                            if [[ ! -d $ts ]]; then
+                                logw "Invalid test suite `basename $ts`, failed to run the auto test..." # TODO: 1 depth dir limit
+                                continue
+                            fi
+                            conf_suite_list_upd $PROJ_ROOT/$F_PROJ_CONF $ts
+                        done
+                        ;;
+
+                    c)  # update customize keyvalues
+                        local kv=${i#*:}
+                        logi "Update customize the key-values pair: {"$kv"}"
+                        for ts in ${TEST_SUITES[@]}; do
+                            conf_customize_upd $ts/$F_SUITE_CONF $kv
+                        done
+                        ;;
+
+                    u)  # TODO: update the whole project's status if cases/suites changed.
+                        ;;
+
+                    l)  # list the project's test suites or suites' cases
+                        if [[ ${#TEST_SUITES[@]} -eq 0 ]]; then
+                            # list the project's test suites
+                            local list=(conf_suite_list_load $PROJ_ROOT/$F_PROJ_CONF)
+                            logi "---------------------- SUITE LIST ---------------------"
+                            for item in ${list[@]}; do
+                                logi $item
+                            done
+                            logi "-------------------------------------------------------"
+                        else
+                            # TODO: show the suites' case list
+                            echo 'TODO'
+                        fi
+                        ;;
+
+                    x)  # execute the test project or test suite
+                        execute_base_suite
+                        for ts in ${TEST_SUITES[@]}; do
+                            execute_suite $ts
+                        done
+                        ;;
+                esac
+                break
+            fi
+        done
+    done
+}
 
 #/----------------------------------------------------------------------------
 #| AT Main Entrance
 #/----------------------------------------------------------------------------
 function __main__ #argv:$1 $2 $3 ...
 {
-#== DEV_PLATFORM
-    local project=$1
-    local action=$2
-    local reserve=$3
-
-    while getopts ':b:c:p:k:r::v::s::e:F' opt; do
+    local execOpts=()
+    while getopts ':c::e::fxlo::p::s::u' opt; do
         case $opt in
-            c)
-                fi
-            ;;
+            f)
+                logi "Automatic confirmed enabled!"
+                FORCE_CONFIRMED=true
+                ;;
 
-            b)
-                autoBuildProj=$OPTARG
-            ;;
+            o)
+                REPORT_ROOT=${OPTARG#:*}
+                [[ $REPORT_ROOT != $OPTARG ]] && REPORT_TYPE=${OPTARG#*:}
+                # TODO: verify if report type supported.
+                logi "Set output report directory [$REPORT_ROOT] & type [$REPORT_TYPE]"
+                ;;
+
+            p)
+                logi "Select Project: "$OPTARG
+                PROJ_NAME=$OPTARG
+                [[ ! -d $SAT_ROOT/$PROJ_NAME ]] && create_project $PROJ_NAME
+                PROJ_ROOT=$SAT_ROOT/$PROJ_NAME
+                ;;
+
+            c|e|x|s)
+                execOpts=(${execOpts[@]} $opt:$OPTARG)
+                ;;
+
+            l|u)
+                execOpts=(${execOpts[@]} $opt:-)
+                ;;
+
+            *)
+                loge "==>Invalid option: "$opt
+                # usage
+                ;;
         esac
     done
 
+    process_options ${execOpts[@]}
     exit 0
 }
 #\----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
-__main__ $PROJ_NAME $* 2>&1
+__main__ -p $PROJ_NAME $* #2>&1 | tee
