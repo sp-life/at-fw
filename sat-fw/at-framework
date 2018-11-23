@@ -1,0 +1,200 @@
+#!/bin/bash
+
+TPLG_FILE=sof-apl-nocodec.tplg
+
+TEMPLATE_ROOT=$SAT_ROOT/template
+
+T_CASE_HEAD=_case_head.t
+T_CASE_TAIL=_case_tail.t
+
+F_CASES_LIST=.tscl
+F_TMP_CASE_LIST=/tmp/.tscl.tmp~
+F_TMP_CASE_SH=/tmp/.tscl.ex.tmp~
+
+# callback function when retreiving the config's items, update the relative varibles
+# param: $1 key, $2 val
+function load_conf_callback
+{
+    local key=$1
+    local val=${@:2}
+    if [[ -n $val ]]; then
+        case $key in
+            $K_REPORT_ROOT)
+                REPORT_ROOT=$val
+                ;;
+
+            $K_REPORT_TYPE)
+                REPORT_TYPE=$val
+                ;;
+
+            $K_ASSIST_TOOLS)
+                ASSIST_TOOLS=$val
+                export PATH=$TOOLS_ROOT:$PATH
+                ;;
+
+            $K_TPLG_FILE)
+                TPLG_FILE=$val
+                ;;
+        esac
+    fi
+}
+
+# prepare the project, load the project's config file
+# param: $1 project
+function prepare_project
+{
+    local proj=$1
+    local projConf=$(conf_general_load $proj/$F_PROJ_CONF)
+    dict_retrieve $projConf load_conf_callback
+}
+
+# cleanup the project relative environment
+function cleanup_project
+{
+    local envPath=$PATH
+    export PATH=${envPath//$ASSIST_TOOLS:/}
+}
+
+# execute the test suite
+# param: $1 suite, $2 random
+function execute_suite
+{
+    # suite must be a absolute path.
+    local suite=$1
+    local random=$2
+    [[ ${suite:0:1} != '/' ]] && {
+        logw "Invalid suite path, skipping test suite."
+        return 1
+    }
+
+    logi "Begin executing test suite: "$suite
+    
+    init_suite $suite
+exit 1
+    load_case_list $suite $random
+
+    while read fname; do
+        case `basename $fname` in
+            $F_PROJ_CONF|$F_SUITE_CONF|$F_INIT_SH|$F_CASES_LIST)
+                continue
+                ;;
+        esac
+
+        logi "-> Executing test case: ["$fname"]"
+        cat $SAT_ROOT/$TEMPLATE_ROOT/$T_CASE_HEAD > $F_TMP_CASE_SH
+        cat $suite/$fname >> $F_TMP_CASE_SH
+        cat $SAT_ROOT/$TEMPLATE_ROOT/$T_CASE_TAIL >> $F_TMP_CASE_SH
+
+        # TODO: 'source' perhaps will use a non-clear enviroment for all cases.
+        # perhaps need be changed to 'sh', but need identify which useful env 
+        # need be passed to new 'shell' via _init_ scripts
+        sh $F_TMP_CASE_SH
+
+        logi "<= Executing test case completed!"
+        rm -rf $F_TMP_CASE_SH
+    done < $F_TMP_CASE_LIST
+    rm -rf $F_TMP_CASE_LIST
+
+    uninit_suite $suite
+
+    logi "End executing test suite: "$suite
+}
+
+# init the suite recusively from high-level to lower-level
+# param: $1 suite
+function init_suite
+{
+    local curr=$1
+    local initList=()
+
+    # locate the _init_env
+    while [[ -n $curr ]]; do
+        [[ -f $curr/$F_INIT_SH ]] && initList=($curr/$F_INIT_SH ${initList[@]})
+        curr=${curr%/*}
+    done
+
+    echo ${initList[@]}
+    # init the environment from high-level to low-level
+    for e in ${initList[@]}; do
+        logi $e
+        source $e
+    done
+}
+
+# uninit the suite recusively from lower-level to high-level
+# param: $1 suite
+function uninit_suite
+{
+    local curr=$1
+    while [[ -n $curr ]]; do
+        [[ -f $curr/$F_UNINIT_SH ]] && source $curr/$F_UNINIT_SH
+        curr=${curr%/*}
+    done
+}
+
+# load case list from fixed test suite case list, or random with current directly.
+# param:  $1 suite, $2 random
+function load_case_list
+{
+    local suite=$1
+    local random=$2
+
+    rm -rf $F_TMP_CASE_LIST
+    touch $F_TMP_CASE_LIST
+
+    if [[ -f $suite/$F_CASES_LIST && $random != true ]]; then
+        cp -f $suite/$F_CASES_LIST $F_TMP_CASE_LIST
+    else
+        local flist=(`cd $suite; find -type f; cd - > /dev/null`)
+        if [[ $random == true ]]; then
+            # FIXME: need generate real random series.
+            local rflist=()
+            local cnt=${#flist[@]}
+            local i=$((RANDOM % cnt))
+            local bExist=false
+            local k=0
+            while [[ ${#rflist[@]} -ne $cnt ]]; do
+                for rf in ${rflist[@]}; do
+                    if [[ "$rf" == "${flist[i]}" ]]; then
+                        bExist=true
+                        break
+                    fi
+                done
+                if [[ $bExist == false ]]; then
+                    rflist=(${rflist[@]} ${flist[$i]})
+                    i=$(((i + 1) % cnt))
+                else
+                    i=$((RANDOM % cnt))
+                fi
+            done
+            flist=(${rflist[@]})
+        fi
+
+        for f in ${flist[@]}; do
+            case `basename $f` in
+                $F_PROJ_CONF|$F_SUITE_CONF|$F_INIT_SH|$F_CASES_LIST)
+                    continue
+                    ;;
+            esac
+            echo $f >> $F_TMP_CASE_LIST
+        done
+    fi
+}
+
+
+
+# response the case failed
+function _case_failed
+{
+    local fcb=__case_failed
+    eval $fcb
+    rpt '<FAILED> '$FAILED_INFO
+}
+
+# response the case passed
+function _case_passed
+{
+    local pcb=__case_passed
+    rpt '<PASSED> '$PASSED_INFO
+    eval $pcb
+}

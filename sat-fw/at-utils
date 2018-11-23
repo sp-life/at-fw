@@ -1,5 +1,4 @@
 #!/bin/bash
-
 ##############################################################################
 # BEG: dict impentation
 #-----------------------------------------------------------------------------
@@ -13,7 +12,8 @@ ATU_EMPTY_DICT='{}'
 ATU_REPL_SP='!'
 
 # get the key's value from dict string.
-function dict_value #$1: dict, $2: key
+# param: $1 dict, $2 key
+function dict_value
 {
     local dict=$1
     local key=$2
@@ -21,7 +21,8 @@ function dict_value #$1: dict, $2: key
 }
 
 # update the key's value or insert new key to dict.
-function dict_update #$1: dict, $2: key=val
+# param: $1 dict, $2 key=val
+function dict_update
 {
     local dict=$1
     if [[ $dict == $ATU_EMPTY_DICT ]]; then
@@ -48,8 +49,9 @@ function dict_update #$1: dict, $2: key=val
 }
 
 # retrieve the dict, and callback with corresponding key & value.
-# TODO: note: the callback function should treat all rest args from 2nd as value.
-function dict_retrieve #$1: dict, $2: func_cb
+# param: $1 dict, $2: func_cb
+# note: the callback function should treat all rest args from 2nd as value.
+function dict_retrieve
 {
     local dict=$1
     local func_cb=$2
@@ -59,7 +61,7 @@ function dict_retrieve #$1: dict, $2: func_cb
         for ckv in ${ckvlist[@]}; do
             local key=${ckv%=*}
             local val=${ckv#*=}
-            func_cb $key ${val//$ATU_REPL_SP/ }
+            $func_cb $key ${val//$ATU_REPL_SP/ }
         done
     fi
 }
@@ -122,6 +124,7 @@ function _undef #$@: array
     done
 }
 
+# dummy code line for empty block within override function
 function __OCCUPY_LINE_DELETE_ME__
 {
     printf ""

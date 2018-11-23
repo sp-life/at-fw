@@ -1,0 +1,7 @@
+verify_firmware_presense.sh
+verify_kernel_model_load_probe.sh
+verify_sof_firware_load.sh
+verify_tplg_binary.sh
+verify_pcm_list.sh
+check_dma_trace.sh
+check_aplay_function.sh
