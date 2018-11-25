@@ -11,6 +11,8 @@ ATU_MIN_RETRIEVE_ARGC=2
 ATU_EMPTY_DICT='{}'
 ATU_REPL_SP='!'
 
+ATU_EXPORT_VLIST=()
+
 # get the key's value from dict string.
 # param: $1 dict, $2 key
 function dict_value
@@ -73,7 +75,7 @@ function dict_retrieve
 # BEG: log
 function __log #$1: tag, $2: content
 {
-    echo $*
+    [[ -z $NDEBUG ]] && echo $*
 }
 
 function logi
@@ -93,34 +95,40 @@ function logw
 
 function rpt
 {
-    __log '[REPORT]:' $@
+    echo '[REPORT]:' $@
 }
 # END: log
 ##############################################################################
 
-function _def #$1: size, $2..$n: array, $...: definitions
+# define a variable which need be exported for child-shell used.
+# param: variable & value, e.g.: foo=bar
+function define
 {
-    local n=$1
-    shift
-    local exp_array=(${@:1:$n})
-    shift $n
     local kv=${@:1}
     if [[ $kv != ${kv%=*} ]]; then
         eval $kv
         eval export ${kv%=*}
-        echo "(${exp_array[@]} ${kv%=*})"
+        ATU_EXPORT_VLIST=(${ATU_EXPORT_VLIST[@]} ${kv%=*})
     else
         eval $kv=${@:2}
         eval export $kv
-        echo "(${exp_array[@]} $kv)"
+        ATU_EXPORT_VLIST=(${ATU_EXPORT_VLIST[@]} $kv)
     fi
 }
 
-function _undef #$@: array
+# undefine a exported variable
+# param: $1 undefined key
+function undefine
 {
-    while [[ ${#@} -gt 0 ]]; do
-        eval unset $1
-        shift
+    local key=$1
+    local index=0
+    for k in ${ATU_EXPORT_VLIST[@]}; do
+        [[ $k == $key ]] && {
+            unset $k
+            unset ATU_EXPORT_VLIST[$index]
+            break
+        }
+        index=$((index + 1))
     done
 }
 

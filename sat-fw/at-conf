@@ -75,10 +75,10 @@ function _conf_upd #$1: conf, $2: session, $3: item
     local session=$2
     local items=(${3//;/ })
 
-    logi "start update config file [$conf]..."
+    echo "start update config file [$conf]..."
 
     for item in ${items[@]}; do
-        grep $session $conf
+        grep $session $conf > /dev/null
         if [[ $? -ne 0 ]]; then
             # create the new session, and attach item
             echo "[$session]" >> $conf
@@ -89,7 +89,8 @@ function _conf_upd #$1: conf, $2: session, $3: item
                 lno=$(sed -n '/\['$session'\]/,/\[/p' $conf | sed -n '/^'$item'$/=')
                 [[ -n $lno ]] && sed -i $lno'd' $conf
             else
-                sed -i $lno'd' $conf
+                sno=$(sed -n '/^\['$session'\]$/=' $conf)
+                sed -i $((sno + lno -1))'d' $conf
             fi
             sed -i '/\['$session'\]/a'$item $conf
         fi
@@ -104,7 +105,7 @@ function _conf_del #$1: conf, $2: session, $3: item
     local session=$2
     local item=$3
 
-    grep $session $conf
+    grep $session $conf > /dev/null
     if [[ $? -eq 0 ]]; then
         local lno=$(sed -n '/\['$session'\]/,/\[/p' $conf | sed -n '/^'${item%=*}'=/=')
         if [[ -z $lno ]]; then
@@ -122,12 +123,16 @@ function _conf_load_session #$1: conf, $2: session, $3: type
     local session=$2
     local type=$3
     local datline=$(sed -n '/\['$session'\]/,/\[/p; /^[[:space:]]$/d;' $conf | xargs echo)
-    #local datline=$(sed -n '/\['$session'\]/,/\[/p; /^[[:space:]]$/d;' $conf | sed ':a; N; s/\n/\;/; ta;')
 
-    datline=${datline#* }
-    datline=${datline% *}
+    # cleanup current & next session label
+    datline=${datline#*]}
+    datline=${datline%[*}
+
     if [[ $type == $SDT_DICT ]]; then
-        echo "{${datline// /;}}"
+        datline="{${datline// /;}}"
+        datline=${datline/\{;/\{}
+        datline=${datline//;;/;}
+        echo $datline
     elif [[ $type == $SDT_ARRAY ]]; then
         echo "($datline)"
     fi

@@ -19,15 +19,19 @@ STR_PROPMT_NEW_SUITE="Test suite(%s) Missed , create test suite now?(Yes/no): "
 
 D_BASE_SUITE=__base__
 D_KEYWORDS_POOL=__keywords__
-F_PROJ_CONF=_proj.conf
 F_SUITE_CONF=_suite.conf
 F_INIT_SH=_init_
 F_UNINIT_SH=_uninit_
 #\----------------------------------------------------------------------------
 
 #/-- Other Definitions -------------------------------------------------------
-OPERATE_ORDER=(s e c u l x)
+OPERATE_ORDER=(s e C c u l x)
 TEST_SUITES=()
+NDEBUG=yes
+#\----------------------------------------------------------------------------
+
+#/-- Export Definitions ------------------------------------------------------
+export SAT_ROOT ASSIST_TOOLS NDEBUG
 #\----------------------------------------------------------------------------
 # END: Config File Load
 ##############################################################################
@@ -49,10 +53,10 @@ function create_project
     PROJ_ROOT=$SAT_ROOT/$projName
     if [[ $FORCE_CONFIRMED == true ]]; then
         mkdir -p $PROJ_ROOT
-        conf_new_proj $PROJ_ROOT/$F_PROJ_CONF
-        conf_general_upd $PROJ_ROOT/$F_PROJ_CONF $K_REPORT_ROOT"=$REPORT_ROOT"
-        conf_general_upd $PROJ_ROOT/$F_PROJ_CONF $K_REPORT_TYPE"=$REPORT_TYPE"
-        conf_general_upd $PROJ_ROOT/$F_PROJ_CONF $K_ASSIST_TOOLS"=$ASSIST_TOOLS"
+        conf_new_proj $PROJ_ROOT/$F_SUITE_CONF
+        conf_general_upd $PROJ_ROOT/$F_SUITE_CONF $K_REPORT_ROOT"=$REPORT_ROOT"
+        conf_general_upd $PROJ_ROOT/$F_SUITE_CONF $K_REPORT_TYPE"=$REPORT_TYPE"
+        conf_general_upd $PROJ_ROOT/$F_SUITE_CONF $K_ASSIST_TOOLS"=$ASSIST_TOOLS"
     else
         printf "$STR_PROPMT_NEW_PROJECT" $projName
         read comfirmed
@@ -61,7 +65,7 @@ function create_project
             exit 1
         else
             mkdir -p $PROJ_ROOT
-            conf_new_proj $PROJ_ROOT/$F_PROJ_CONF
+            conf_new_proj $PROJ_ROOT/$F_SUITE_CONF
         fi
     fi
 }
@@ -70,11 +74,11 @@ function create_project
 # param: <n/a>
 function execute_base_suite
 {
-    [[ ! -d $PROJ_ROOT/$F_BASE_SUITE ]] && {
+    [[ ! -d $PROJ_ROOT/$D_BASE_SUITE ]] && {
         logw "No base test suite for the project, skipping base test..."
         return 0
     }
-    execute_suite $PROJ_ROOT/$F_BASE_SUITE
+    execute_suite $PROJ_ROOT/$D_BASE_SUITE
 }
 
 # process the input operator options
@@ -110,7 +114,7 @@ function process_options
                                     continue
                                 else
                                     mkdir -p $PROJ_ROOT
-                                    conf_new_proj $PROJ_ROOT/$F_PROJ_CONF
+                                    conf_new_proj $PROJ_ROOT/$F_SUITE_CONF
                                 fi
                             fi
                             TEST_SUITES=(${TEST_SUITES[@]} $ts)
@@ -128,7 +132,7 @@ function process_options
                                 logw "Invalid test suite `basename $ts`, failed to run the auto test..." # TODO: 1 depth dir limit
                                 continue
                             fi
-                            conf_suite_list_upd $PROJ_ROOT/$F_PROJ_CONF $ts
+                            conf_suite_list_upd $PROJ_ROOT/$F_SUITE_CONF $ts
                         done
                         ;;
 
@@ -140,13 +144,19 @@ function process_options
                         done
                         ;;
 
+                    C)  # update customize keyvalues for project level
+                        local kv=${i#*:}
+                        logi "Update customize the key-values pair: {"$kv"}"
+                        conf_customize_upd $PROJ_ROOT/$F_SUITE_CONF $kv
+                        ;;
+
                     u)  # TODO: update the whole project's status if cases/suites changed.
                         ;;
 
                     l)  # list the project's test suites or suites' cases
                         if [[ ${#TEST_SUITES[@]} -eq 0 ]]; then
                             # list the project's test suites
-                            local list=(conf_suite_list_load $PROJ_ROOT/$F_PROJ_CONF)
+                            local list=(conf_suite_list_load $PROJ_ROOT/$F_SUITE_CONF)
                             logi "---------------------- SUITE LIST ---------------------"
                             for item in ${list[@]}; do
                                 logi $item
@@ -166,7 +176,7 @@ function process_options
 exit 1
                         if [[ ${#TEST_SUITES[@]} -eq 0 ]]; then
                             # list the project's test suites
-                            local list=(conf_suite_list_load $PROJ_ROOT/$F_PROJ_CONF)
+                            local list=(conf_suite_list_load $PROJ_ROOT/$F_SUITE_CONF)
                             for item in ${list[@]}; do
                                 if [[ ${item#*=} == y ]]; then
                                     execute_suite $PROJ_ROOT/${item%=*}
@@ -193,7 +203,7 @@ exit 1
 function __main__ #argv:$1 $2 $3 ...
 {
     local execOpts=()
-    while getopts ':c::e::fxlo::p::s::u' opt; do
+    while getopts ':c:C::e::fxlo::p::s::u' opt; do
         case $opt in
             f)
                 logi "Automatic confirmed enabled!"
@@ -214,7 +224,7 @@ function __main__ #argv:$1 $2 $3 ...
                 PROJ_ROOT=$SAT_ROOT/$PROJ_NAME
                 ;;
 
-            c|e|x|s)
+            C|c|e|x|s)
                 execOpts=(${execOpts[@]} $opt:$OPTARG)
                 ;;
 

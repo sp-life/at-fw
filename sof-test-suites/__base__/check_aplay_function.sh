@@ -14,10 +14,6 @@ function __case_failed
 
 function __execute
 {
-    logi "tplg execute something..." ${_TPLG_LIST[@]}
-    for tplg in ${_TPLG_LIST[@]}; do
-        echo "----...>>>....tplg item: " $tplg
-    done
-exit 1
+    logi "tplg execute something..."
     return 0
 }

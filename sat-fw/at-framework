@@ -1,7 +1,5 @@
 #!/bin/bash
 
-TPLG_FILE=sof-apl-nocodec.tplg
-
 TEMPLATE_ROOT=$SAT_ROOT/template
 
 T_CASE_HEAD=_case_head.t
@@ -31,12 +29,15 @@ function load_conf_callback
                 ASSIST_TOOLS=$val
                 export PATH=$TOOLS_ROOT:$PATH
                 ;;
-
-            $K_TPLG_FILE)
-                TPLG_FILE=$val
-                ;;
         esac
     fi
+}
+
+function load_customize_callback
+{
+    local key=$1
+    local val=${@:2}
+    eval export $key=$val
 }
 
 # prepare the project, load the project's config file
@@ -44,7 +45,8 @@ function load_conf_callback
 function prepare_project
 {
     local proj=$1
-    local projConf=$(conf_general_load $proj/$F_PROJ_CONF)
+    local projConf=$(conf_general_load $proj/$F_SUITE_CONF)
+    [[ -d $PROJ_ROOT/$D_KEYWORDS_POOL ]] && export PATH=$PROJ_ROOT/$D_KEYWORDS_POOL:$PATH
     dict_retrieve $projConf load_conf_callback
 }
 
@@ -53,6 +55,7 @@ function cleanup_project
 {
     local envPath=$PATH
     export PATH=${envPath//$ASSIST_TOOLS:/}
+    [[ -d $PROJ_ROOT/$D_KEYWORDS_POOL ]] && export PATH=${envPath//$PROJ_ROOT\/$D_KEYWORDS_POOL:/}
 }
 
 # execute the test suite
@@ -67,37 +70,57 @@ function execute_suite
         return 1
     }
 
-    logi "Begin executing test suite: "$suite
-    
-    init_suite $suite
-exit 1
-    load_case_list $suite $random
+    logi "Begin executing test suite: ["`basename $suite`"]"
 
+    init_suite $suite
+    load_case_list $suite $random
+    local total=`cat $F_TMP_CASE_LIST | wc -l`
+    logi "-------------------------- TOTAL CASES [$total] --------------------------"
+    local i=1
+    local passedCnt=0
     while read fname; do
         case `basename $fname` in
-            $F_PROJ_CONF|$F_SUITE_CONF|$F_INIT_SH|$F_CASES_LIST)
+            $F_SUITE_CONF|$F_INIT_SH|$F_CASES_LIST)
                 continue
                 ;;
         esac
 
-        logi "-> Executing test case: ["$fname"]"
-        cat $SAT_ROOT/$TEMPLATE_ROOT/$T_CASE_HEAD > $F_TMP_CASE_SH
+        logi "BEG| {$i- $fname}: Executing Case..."
+        cat $TEMPLATE_ROOT/$T_CASE_HEAD > $F_TMP_CASE_SH
         cat $suite/$fname >> $F_TMP_CASE_SH
-        cat $SAT_ROOT/$TEMPLATE_ROOT/$T_CASE_TAIL >> $F_TMP_CASE_SH
+        cat $TEMPLATE_ROOT/$T_CASE_TAIL >> $F_TMP_CASE_SH
 
         # TODO: 'source' perhaps will use a non-clear enviroment for all cases.
         # perhaps need be changed to 'sh', but need identify which useful env 
         # need be passed to new 'shell' via _init_ scripts
-        sh $F_TMP_CASE_SH
-
-        logi "<= Executing test case completed!"
+        bash $F_TMP_CASE_SH
+    
+        [[ $? -eq 0 ]] && passedCnt=$((passedCnt + 1))
+        logi "END| {$i- $fname}: Executing Done!"
         rm -rf $F_TMP_CASE_SH
+        i=$((i + 1))
     done < $F_TMP_CASE_LIST
     rm -rf $F_TMP_CASE_LIST
 
     uninit_suite $suite
+    logi "End executing test suite: ["`basename $suite`"]"
+    logi "----------------------------------------------------------------"
 
-    logi "End executing test suite: "$suite
+    report $suite $total $passedCnt
+}
+
+# report the test result
+# param: $1 suite, $2 total, $3 passedCnt
+function report
+{
+    rpt "========================== Summary =============================="
+    rpt "Test Date: "`date`
+    rpt "Case Suites: ["$suite"]"
+    rpt "Total Cases : "$total
+    rpt "Passed Count: "$passedCnt
+    rpt "Failed Count: "$((total - passedCnt))
+    rpt "Pass Rate:    "$((passedCnt * 100 / total))"%"
+    rpt "================================================================"
 }
 
 # init the suite recusively from high-level to lower-level
@@ -106,14 +129,21 @@ function init_suite
 {
     local curr=$1
     local initList=()
+    local custConfList=()
 
     # locate the _init_env
     while [[ -n $curr ]]; do
         [[ -f $curr/$F_INIT_SH ]] && initList=($curr/$F_INIT_SH ${initList[@]})
+        [[ -f $curr/$F_SUITE_CONF ]] && custConfList=($curr/$F_SUITE_CONF ${initList[@]})
         curr=${curr%/*}
     done
 
-    echo ${initList[@]}
+    # init the customized variables
+    for conf in ${custConfList[@]}; do
+        local custConf=$(conf_customize_load $conf)
+        dict_retrieve $custConf load_customize_callback
+    done
+
     # init the environment from high-level to low-level
     for e in ${initList[@]}; do
         logi $e
@@ -142,10 +172,12 @@ function load_case_list
     rm -rf $F_TMP_CASE_LIST
     touch $F_TMP_CASE_LIST
 
+    logw $suite/$F_CASES_LIST
     if [[ -f $suite/$F_CASES_LIST && $random != true ]]; then
         cp -f $suite/$F_CASES_LIST $F_TMP_CASE_LIST
     else
-        local flist=(`cd $suite; find -type f; cd - > /dev/null`)
+        local flist=(`cd $suite;find $suite -type f;cd -`)
+        loge ${flist[@]}
         if [[ $random == true ]]; then
             # FIXME: need generate real random series.
             local rflist=()
@@ -172,7 +204,7 @@ function load_case_list
 
         for f in ${flist[@]}; do
             case `basename $f` in
-                $F_PROJ_CONF|$F_SUITE_CONF|$F_INIT_SH|$F_CASES_LIST)
+                $F_SUITE_CONF|$F_INIT_SH|$F_CASES_LIST)
                     continue
                     ;;
             esac
@@ -181,14 +213,13 @@ function load_case_list
     fi
 }
 
-
-
 # response the case failed
 function _case_failed
 {
     local fcb=__case_failed
     eval $fcb
     rpt '<FAILED> '$FAILED_INFO
+    exit 1
 }
 
 # response the case passed
@@ -197,4 +228,5 @@ function _case_passed
     local pcb=__case_passed
     rpt '<PASSED> '$PASSED_INFO
     eval $pcb
+    exit 0
 }

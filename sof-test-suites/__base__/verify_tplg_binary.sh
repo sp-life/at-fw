@@ -14,5 +14,6 @@ function __case_failed
 
 function __execute
 {
+    logi 'verify tplg binary ... '
     return 0
 }
