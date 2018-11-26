@@ -25,9 +25,13 @@ function load_conf_callback
                 REPORT_TYPE=$val
                 ;;
 
-            $K_ASSIST_TOOLS)
-                ASSIST_TOOLS=$val
-                export PATH=$TOOLS_ROOT:$PATH
+            $K_ASSIST_BIN)
+                echo "load config callback : "$val
+                if [[ -d $val ]]; then
+                    ASSIST_BIN=$val
+                elif [[ -d $PROJ_ROOT/$val ]]; then
+                    ASSIST_BIN=$PROJ_ROOT/$val
+                fi
                 ;;
         esac
     fi
@@ -46,8 +50,10 @@ function prepare_project
 {
     local proj=$1
     local projConf=$(conf_general_load $proj/$F_SUITE_CONF)
-    [[ -d $PROJ_ROOT/$D_KEYWORDS_POOL ]] && export PATH=$PROJ_ROOT/$D_KEYWORDS_POOL:$PATH
     dict_retrieve $projConf load_conf_callback
+
+    [[ -d $PROJ_ROOT/$D_KEYWORDS_POOL ]] && export PATH=$PROJ_ROOT/$D_KEYWORDS_POOL:$PATH
+    export PATH=$ASSIST_BIN:$PATH
 }
 
 # cleanup the project relative environment
@@ -85,7 +91,7 @@ function execute_suite
                 ;;
         esac
 
-        logi "BEG| {$i- $fname}: Executing Case..."
+        logi "BEG| {$i - $fname}: Executing Case..."
         cat $TEMPLATE_ROOT/$T_CASE_HEAD > $F_TMP_CASE_SH
         cat $suite/$fname >> $F_TMP_CASE_SH
         cat $TEMPLATE_ROOT/$T_CASE_TAIL >> $F_TMP_CASE_SH
@@ -172,7 +178,6 @@ function load_case_list
     rm -rf $F_TMP_CASE_LIST
     touch $F_TMP_CASE_LIST
 
-    logw $suite/$F_CASES_LIST
     if [[ -f $suite/$F_CASES_LIST && $random != true ]]; then
         cp -f $suite/$F_CASES_LIST $F_TMP_CASE_LIST
     else

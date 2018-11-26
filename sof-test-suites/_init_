@@ -1,3 +1,31 @@
 #!/bin/bash
 
+define _TPLG=$tplg
+
+_TPLG_ROOT='/lib/firmware/intel'
+if [[ ! -f $tplg ]]; then
+    if [[ -f $_TPLG_ROOT/$tplg ]]; then
+        _TPLG=$_TPLG_ROOT/$tplg
+    else
+        _TPLG=
+    fi
+fi
+
+define _PLATFORM='unknonw'
+
+modVers=`lscpu |grep "Model name" |awk -F " " '{print $6}'`
+case $modVers in
+    'E3826'|'E3845')
+        _PLATFORM="byt"
+        ;;
+    'A3960'|'N4200')
+        _PLATFORM="apl"
+        ;;
+    '0000')
+        _PLATFORM="cnl"
+        ;;
+    *)
+        logw 'Unsupported Model'
+        return 1
+esac
 

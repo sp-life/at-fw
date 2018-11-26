@@ -1,6 +1,6 @@
 #!/bin/bash
 PASSED_INFO=""
-FAILED_INFO=""
+FAILED_INFO="DSP firmware were not loaded."
 
 function __case_passed
 {
@@ -9,7 +9,7 @@ function __case_passed
 
 function __case_failed
 {
-    rpt 'DSP firmware were not loaded.'
+    __OCCUPY_LINE_DELETE_ME__ #case passed post response
 }
 
 function __execute

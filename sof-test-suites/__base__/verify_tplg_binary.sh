@@ -14,6 +14,5 @@ function __case_failed
 
 function __execute
 {
-    logi 'verify tplg binary ... '
-    return 0
+    return [[ -n $_TPLG_ARRAY ]]
 }

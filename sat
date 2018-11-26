@@ -4,7 +4,7 @@
 #-----------------------------------------------------------------------------
 #/-- General Definitions -----------------------------------------------------
 SAT_ROOT=$(dirname `pwd`/$0)
-ASSIST_TOOLS=$SAT_ROOT/tools
+ASSIST_BIN=$SAT_ROOT/tools
 PROJ_NAME=sof-test-suites
 PROJ_ROOT=$SAT_ROOT/$PROJ_NAME
 LOG_FILE_NAME=
@@ -27,11 +27,11 @@ F_UNINIT_SH=_uninit_
 #/-- Other Definitions -------------------------------------------------------
 OPERATE_ORDER=(s e C c u l x)
 TEST_SUITES=()
-NDEBUG=yes
+NDEBUG=
 #\----------------------------------------------------------------------------
 
 #/-- Export Definitions ------------------------------------------------------
-export SAT_ROOT ASSIST_TOOLS NDEBUG
+export SAT_ROOT ASSIST_BIN NDEBUG
 #\----------------------------------------------------------------------------
 # END: Config File Load
 ##############################################################################
@@ -56,7 +56,7 @@ function create_project
         conf_new_proj $PROJ_ROOT/$F_SUITE_CONF
         conf_general_upd $PROJ_ROOT/$F_SUITE_CONF $K_REPORT_ROOT"=$REPORT_ROOT"
         conf_general_upd $PROJ_ROOT/$F_SUITE_CONF $K_REPORT_TYPE"=$REPORT_TYPE"
-        conf_general_upd $PROJ_ROOT/$F_SUITE_CONF $K_ASSIST_TOOLS"=$ASSIST_TOOLS"
+        conf_general_upd $PROJ_ROOT/$F_SUITE_CONF $K_ASSIST_BIN"=$ASSIST_BIN"
     else
         printf "$STR_PROPMT_NEW_PROJECT" $projName
         read comfirmed
@@ -113,8 +113,9 @@ function process_options
                                     logw "Invalid test suite, skip to preparing load ..."
                                     continue
                                 else
-                                    mkdir -p $PROJ_ROOT
-                                    conf_new_proj $PROJ_ROOT/$F_SUITE_CONF
+				    logw "TODO: test suite need be created!"
+                                    mkdir -p $ts
+#                                    conf_new_suite $ts/$F_SUITE_CONF
                                 fi
                             fi
                             TEST_SUITES=(${TEST_SUITES[@]} $ts)

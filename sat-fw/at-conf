@@ -132,7 +132,7 @@ function _conf_load_session #$1: conf, $2: session, $3: type
         datline="{${datline// /;}}"
         datline=${datline/\{;/\{}
         datline=${datline//;;/;}
-        echo $datline
+        echo "$datline"
     elif [[ $type == $SDT_ARRAY ]]; then
         echo "($datline)"
     fi

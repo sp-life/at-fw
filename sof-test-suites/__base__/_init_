@@ -1,10 +1,13 @@
 #!/bin/bash
 
-#define tplg=sof-apl-pcm512x.tplg
-#define TPLG_PCM_LIST=(
-#    "{PCM=HMDI0;ID=0;RATE_MIN=48000;RATE_MAX=48000;SRC=1;VOL=0;TYPE=playback;}"
-#    "{PCM=HMDI1;ID=1;RATE_MIN=48000;RATE_MAX=48000;SRC=1;VOL=0;TYPE=capture;}"
-#    "{PCM=HMDI2;ID=2;RATE_MIN=48000;RATE_MAX=48000;SRC=1;VOL=0;TYPE=playback;}")
+define _TPLG=$tplg
 
-echo "init the __base__"$tplg
-#echo ${TPLG_PCM_LIST[@]}
+_TPLG_ROOT='/lib/firmware/intel'
+if [[ ! -f $tplg ]]; then
+    if [[ -f $_TPLG_ROOT/$tplg ]]; then
+        _TPLG=$_TPLG_ROOT/$tplg
+    else
+        _TPLG=
+    fi
+fi
+
