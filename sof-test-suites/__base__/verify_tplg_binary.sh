@@ -14,5 +14,6 @@ function __case_failed
 
 function __execute
 {
-    return [[ -n $_TPLG_ARRAY ]]
+    local tplgDat=$(tplgreader -i $_TPLG -j)
+    [[ -z $tplgDat ]] && return 1 || return 0
 }

@@ -1,5 +1,6 @@
+#!/bin/bash
 PASSED_INFO=""
-FAILED_INFO=""
+FAILED_INFO="SOF Modules were not loaded."
 
 function __case_passed
 {
@@ -13,6 +14,6 @@ function __case_failed
 
 function __execute
 {
-    logi 'model load probe checking....'
-    return 0
+    lsmod | grep -i snd_soc > /dev/null$
+    return $?
 }
