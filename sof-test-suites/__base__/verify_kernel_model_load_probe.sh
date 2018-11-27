@@ -14,6 +14,6 @@ function __case_failed
 
 function __execute
 {
-    lsmod | grep -i snd_soc > /dev/null$
+    echo 123 | sudo -n lsmod | grep -i snd_soc > /dev/null
     return $?
 }

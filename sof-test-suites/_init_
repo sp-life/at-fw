@@ -11,7 +11,7 @@ if [[ ! -f $tplg ]]; then
     fi
 fi
 
-define _PLATFORM='unknonw'
+define _PLATFORM='unknown'
 
 modVers=`lscpu |grep "Model name" |awk -F " " '{print $6}'`
 case $modVers in

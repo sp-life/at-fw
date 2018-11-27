@@ -17,6 +17,7 @@ function __execute
     dmesg | grep 'firmware boot complete' > /dev/null
     dmesg | grep 'Firmware info' > /dev/null
 
+    # TODO: Need a version file to track all components version: include the sof, kernel, tplg.
     local firmware_version=0.9
     vers=`dmesg | grep "FW loaded" |head -1 |grep "version:" |cut -d : -f 4 |cut -c 2-4`
 

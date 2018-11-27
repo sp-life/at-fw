@@ -2,6 +2,8 @@
 PASSED_INFO=""
 FAILED_INFO=""
 
+SUDO_EXEC="echo 123 | sudo -S"
+
 function __case_passed
 {
     __OCCUPY_LINE_DELETE_ME__ #case passed post response
@@ -14,7 +16,7 @@ function __case_failed
 
 function __execute
 {
-    local tplgDat=$(tplgreader -i $_TPLG -j)
+    local tplgDat=($(tplgreader -i $_TPLG -j))
     local tpbList=()
     local tcpList=()
     for tplg in ${tplgDat[@]}; do
@@ -36,8 +38,9 @@ function __execute
         esac
     done
 
-    local pbList=(`aplay -l 2>/dev/null | sed -n '/ device /p;' | sed 's/.*device //; s/(.*//; s/ //' | xargs echo`)
-    local cpList=(`arecord -l 2>/dev/null | sed -n '/ device /p;' | sed 's/.*device //; s/(.*//; s/ //' | xargs echo`)
+    local pbList=(`eval $SUDO_EXEC aplay -l 2>/dev/null | sed -n '/ device /p;' | sed 's/.*device //; s/(.*//; s/ //' | xargs echo`)
+
+    local cpList=(`eval $SUDO_EXEC arecord -l 2>/dev/null | sed -n '/ device /p;' | sed 's/.*device //; s/(.*//; s/ //' | xargs echo`)
 
     if [[ ${#tpbList[@]} -ne ${#pbList[@]} || ${#tcpList[@]} -ne ${#cpList[@]} ]]; then
         logw "The $_TPLG doesn't match the loaded topology!"
